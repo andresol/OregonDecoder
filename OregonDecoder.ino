@@ -454,11 +454,8 @@ public:
         } else if (width >= 5000 && pos >= 5 /*&& 8 * pos + bits == 50*/) {
             for (byte i = 0; i < 6; ++i) 
                 gotBit(0);
-                //alignTail(7); // keep last 56 bits
-            for (int i = 0 ; i < sizeof(bytes); i++) {
-                 Serial.print(bytes[i]);
-            }
-           Serial.print('\n');
+                alignTail(7); // keep last 56 bits
+          
             return 1;
         } else
             return -1;

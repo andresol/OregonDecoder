@@ -671,7 +671,7 @@ OregonDecoderV3 orscV3;
 //CrestaDecoder cres;
 //KakuDecoder kaku;
 //XrfDecoder xrf;
-//HezDecoder hez;
+HezDecoder hez;
 //NexaDecoder nexa;
 //VisonicDecoder viso;
 //EMxDecoder emx;
@@ -952,7 +952,8 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
 //if checksum is OK      
       Serial.print("Rain Guage found ");
       Serial.print ("ID") ;
-      Serial.print(data[4]); 
+      Serial.print(data[2] >> 4); 
+      Serial.print(data[3] & 0x0F);
       Serial.print (" ") ;
       Serial.print("Rain ");
       RainRateNow = ((data[5]>>4) * 100)  + ((data[5] & 0x0F) * 10) + (data[4] >> 4);
@@ -1018,7 +1019,8 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
      OutTempNow= ((data[5]>>4) * 100)  + ((data[5] & 0x0F) * 10) + ((data[4] >> 4));
       if ((data[6] & 0x0F) >= 8) OutTempNow=-OutTempNow;
       Serial.print ("ID") ;
-      Serial.print(data[4]); 
+      Serial.print(data[2] >> 4); 
+      Serial.print(data[3] & 0x0F); 
       Serial.print (" ") ;
       Serial.print(float(OutTempNow)/10,1);
       Serial.print("C  Humidity ");
@@ -1040,7 +1042,8 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
  {
     Serial.print("Indoor temperature ");
     Serial.print ("ID") ;
-    Serial.print(data[4]); 
+    Serial.print(data[2] >> 4); 
+    Serial.print(data[3] & 0x0F); 
     Serial.print (" ") ;
     InTempNow= ((data[5]>>4) * 100)  + ((data[5] & 0x0F) * 10) + ((data[4] >> 4));
    if ((data[6] & 0x0F) >= 8) InTempNow=-InTempNow;
@@ -1133,8 +1136,8 @@ void loop () {
         //    reportSerial("XRF", xrf);
         //if (nexa.nextPulse(p))
         //    reportSerial("NEXA", nexa);        
-     //   if (hez.nextPulse(p))
-      //      reportSerial("HEZ", hez);
+        if (hez.nextPulse(p))
+            reportSerial("HEZ", hez);
     }
         
     //if (p != 0) {

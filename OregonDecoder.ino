@@ -423,29 +423,7 @@ public:
 class HezDecoder : public DecodeOOK {
 public:
     HezDecoder () {}
-    
-    byte bytes[150];
-    
-      virtual void gotBit (byte value) {
-        total_bits++;
-        byte *ptr = data + pos;
-        *ptr = (*ptr >> 1) | (value << 7);
-        bytes[counter] = value;
-        counter++;
-        if (++bits >= 8) {
-            bits = 0;
-            if (++pos >= sizeof data) {
-                counter == 0;
-                for (int i = 0 ; i < sizeof(bytes); i++) {
-                  bytes[i] = 0;
-                }
-                resetDecoder();
-                return;
-            }
-        }
-        state = OK;
-    }
-    
+  
     // see also http://homeeasyhacking.wikia.com/wiki/Home_Easy_Hacking_Wiki
     virtual char decode (word width) {
         if (200 <= width && width < 1200) {
@@ -1133,8 +1111,8 @@ void loop () {
         //    reportSerial("XRF", xrf);
         //if (nexa.nextPulse(p))
         //    reportSerial("NEXA", nexa);        
-        if (hez.nextPulse(p))
-            reportSerial("HEZ", hez);
+        //if (hez.nextPulse(p))
+        //    reportSerial("HEZ", hez);
     }
         
     //if (p != 0) {

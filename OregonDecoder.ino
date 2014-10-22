@@ -1,3 +1,6 @@
+
+
+
 // Oregon V2 decoder added - Dominique Pierre
 // Oregon V3 decoder revisited - Dominique Pierre
 // New code to decode OOK signals from weather sensors, etc.
@@ -62,6 +65,8 @@ boolean PowerFlag = false;
 boolean Extreme24Flag = false;
 boolean ExtremeYearFlag = false;
 boolean RainNewFlag = true;
+int celsius = 0;
+const char* lastValue = "";
 
 
 // Grab nibbile from packet and reverse it
@@ -90,7 +95,7 @@ byte Reverse(byte b)
 class DecodeOOK {
 protected:
     byte total_bits, bits, flip, state, pos, data[25];
-
+    int counter;
     virtual char decode (word width) =0;
     
 public:
@@ -117,7 +122,7 @@ public:
     }
     
     void resetDecoder () {
-        total_bits = bits = pos = flip = 0;
+        total_bits = bits = pos = flip = counter = 0 ;
         state = UNKNOWN;
     }
     
@@ -127,7 +132,7 @@ public:
         total_bits++;
         byte *ptr = data + pos;
         *ptr = (*ptr >> 1) | (value << 7);
-
+        
         if (++bits >= 8) {
             bits = 0;
             if (++pos >= sizeof data) {
@@ -248,6 +253,7 @@ public:
         return total_bits == 160 ? 1: 0;
     }
 };
+
 
 class OregonDecoderV3 : public DecodeOOK {
 public:
@@ -418,21 +424,94 @@ class HezDecoder : public DecodeOOK {
 public:
     HezDecoder () {}
     
+    byte bytes[150];
+    
+      virtual void gotBit (byte value) {
+        total_bits++;
+        byte *ptr = data + pos;
+        *ptr = (*ptr >> 1) | (value << 7);
+        bytes[counter] = value;
+        counter++;
+        if (++bits >= 8) {
+            bits = 0;
+            if (++pos >= sizeof data) {
+                counter == 0;
+                for (int i = 0 ; i < sizeof(bytes); i++) {
+                  bytes[i] = 0;
+                }
+                resetDecoder();
+                return;
+            }
+        }
+        state = OK;
+    }
+    
     // see also http://homeeasyhacking.wikia.com/wiki/Home_Easy_Hacking_Wiki
     virtual char decode (word width) {
         if (200 <= width && width < 1200) {
             byte w = width >= 600;
             gotBit(w);
         } else if (width >= 5000 && pos >= 5 /*&& 8 * pos + bits == 50*/) {
-            for (byte i = 0; i < 6; ++i)
+            for (byte i = 0; i < 6; ++i) 
                 gotBit(0);
-            alignTail(7); // keep last 56 bits
+                //alignTail(7); // keep last 56 bits
+            for (int i = 0 ; i < sizeof(bytes); i++) {
+                 Serial.print(bytes[i]);
+            }
+           Serial.print('\n');
             return 1;
         } else
             return -1;
         return 0;
     }
 };
+
+class NexaDecoder : public DecodeOOK {
+public:
+    NexaDecoder () {}
+    byte prevBit;
+    
+     virtual void gotBit (byte value) {
+       int total = total_bits;
+        if (total % 2 == 1) {
+          if ((prevBit + value) != 1) { // Error check. Must Be 01 or 10
+              resetDecoder();
+              return;
+          }
+        
+           byte *ptr = data + pos;
+           *ptr = (*ptr >> 1) | (value << 7);
+        
+          if (++bits >= 8) {
+              bits = 0;
+              if (++pos >= sizeof data) {
+                  resetDecoder();
+                  return;
+              }
+          }
+        }
+        prevBit = value;
+        total_bits++;
+        state = OK;
+    }
+    
+    // see also http://homeeasyhacking.wikia.com/wiki/Home_Easy_Hacking_Wiki
+    virtual char decode (word width) {
+        if (200 <= width && width < 1750) {
+            byte w = width >= 600;
+            gotBit(w);
+        } else if (width >= 5000 && pos >= 5 /*&& 8 * pos + bits == 50*/) {
+            //for (byte i = 0; i < 6; ++i) 
+            //    gotBit(0);
+                //alignTail(7); // keep last 56 bits
+            return 1;
+        } else
+            return -1;
+        return 0;
+    }
+};
+
+
 
 // 868 MHz decoders
 
@@ -589,14 +668,15 @@ public:
 
 OregonDecoderV2 orscV2;
 OregonDecoderV3 orscV3;
-CrestaDecoder cres;
-KakuDecoder kaku;
-XrfDecoder xrf;
-HezDecoder hez;
-VisonicDecoder viso;
-EMxDecoder emx;
-KSxDecoder ksx;
-FSxDecoder fsx;
+//CrestaDecoder cres;
+//KakuDecoder kaku;
+//XrfDecoder xrf;
+//HezDecoder hez;
+//NexaDecoder nexa;
+//VisonicDecoder viso;
+//EMxDecoder emx;
+//KSxDecoder ksx;
+//FSxDecoder fsx;
 
 #define PORT 2
 
@@ -614,22 +694,27 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
     byte pos;
     unsigned int watts;
     const byte* data = decoder.getData(pos);
-    Serial.print(s);
-    Serial.print(' ');
-    for (byte i = 0; i < pos; ++i) {
-        Serial.print(data[i] >> 4, HEX);
-        Serial.print(data[i] & 0x0F, HEX);
-    }
+    //Serial.print(s);
+    lastValue = s;
+    //Serial.print("Pos:");
+    //Serial.println(pos);
+    //Serial.print(' ');
+    //for (byte i = 0; i < pos; ++i) {
+    //    Serial.print(data[i] >> 4, HEX);
+    //    Serial.print(" ");
+    //    //Serial.print(data[i]);
+    //    Serial.print(data[i] & 0x0F, HEX);
+    //}
     
-    if (pos > 5) {
-      Serial.print('\t');
-      watts = ((data[4] * 256) + (data[3] & 0xF0)) * 1.006196884; 
-      Serial.print(watts);
-    }
+    //if (pos > 5) {
+    //  Serial.print('\t');
+    //  watts = ((data[4] * 256) + (data[3] & 0xF0)) * 1.006196884; 
+    //  Serial.print(watts);
+    //}
     // Serial.print(' ');
     // Serial.print(millis() / 1000);
     
-    Serial.println();
+    //Serial.println();
     //General note where possible, values multiplied by 10 to give integers to 1 dcimal point when divided by 10 later.  Less memory hungry.
   
   // OWL Electricty Meter
@@ -695,10 +780,10 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
  {
     
    int battery=0;
-    int celsius= ((data[5]>>4) * 100)  + ((data[5] & 0x0F) * 10) + ((data[4] >> 4));
+    celsius= ((data[5]>>4) * 100)  + ((data[5] & 0x0F) * 10) + ((data[4] >> 4)); //11..8 11 is flag bit. 10..8 temp.
     if ((data[6] & 0x0F) >= 8) celsius=-celsius;
     int hum = ((data[7] & 0x0F)*10)+ (data[6] >> 4);
-    if ((data[4] & 0x0F) >= 4)
+    if ((data[2] & 0x0F) == 3)
     {
       battery=0;
     }
@@ -708,22 +793,22 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
     }   
     Serial.print("THGR228N found ");
 
-    switch (data[2]) {
-    case 0x10:
+    switch (data[2] & 0x0F) { //Nibbel 5
+    case 1:
       CH1TempNow=celsius;
       CH1HumNow=hum;
       CH1Bat=battery;
 
       Serial.print("CH1  ");
       break;
-    case 0x20:
+    case 2:
       CH2TempNow=celsius;
       CH2HumNow=hum;
       CH2Bat=battery;
 
       Serial.print("CH2  ");
       break;
-    case 0x40:
+    case 4:
       CH3TempNow=celsius;
       CH3HumNow=hum;
       CH3Bat=battery;
@@ -732,13 +817,21 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
      break;
     } 
     Serial.print ("ID") ;
-    Serial.print(data[4]); 
+    Serial.print(data[2] >> 4); 
+    Serial.print(data[3] & 0x0F); 
     Serial.print (" ") ;
+    //Serial.print(" ");
+    //Serial.print(data[2]);
+    //Serial.print(" ");
+    //Serial.print("Temp: ");
     Serial.print(float(celsius)/10,1);
+    //Serial.println(" c");
+    //Serial.print(hum);
+   // Serial.print("Temp: ");
+   // Serial.print(float(CH3TempNow)/10,1);
     Serial.print("C  Humidity ");
-    Serial.print(hum);
+    Serial.print(CH3HumNow);
     Serial.print("%  Battery ");  
-    
     Serial.print(battery);
     Serial.println("%");      
  }
@@ -815,11 +908,12 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
       { 
 //if checksum is OK
       Serial.print ("ID") ;
-      Serial.print(data[4]); 
+      Serial.print(data[2] >> 4); 
+      Serial.print(data[3] & 0x0F); 
       Serial.print (" ") ;   
       Serial.print("Direction ");
-      //DirectionNow = ((data[5]>>4) * 100)  + ((data[5] & 0x0F * 10) ) + (data[4] >> 4);
-      DirectionNow = GetNibble(9, data) * 22.5;
+      DirectionNow = ((data[4]>>4) * 22.5);
+      //DirectionNow = GetNibble(9, data) * 22.5;
       Serial.print(DirectionNow);
       Serial.print(" degrees  Current Speed (Gust) ");
       GustNow = ((data[7] & 0x0F) * 100)  + ((data[6]>>4) * 10)  + ((data[6] & 0x0F)) ;
@@ -996,22 +1090,24 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
     InTempBat=(10-(data[4] & 0x0F))*10;
     Serial.print(InTempBat);
     Serial.println("%");      
- } 
+ }
+ 
+//if 
  
     
     decoder.resetDecoder();
 }
 
 
+
 void setup () {
     Serial.begin(9600);
-    Serial.println("\n[ookDecoder]");
-     pinMode(3, OUTPUT);
+    Serial.println("\n[Starting]");
+    pinMode(3, OUTPUT);
     digitalWrite(3,HIGH);
     pinMode(PORT, INPUT);  // use
-  attachInterrupt (0, rupt, CHANGE);
-
-
+   attachInterrupt (0, rupt, CHANGE);
+  
 }
 
 void loop () {
@@ -1029,24 +1125,27 @@ void loop () {
             reportSerial("OSV2", orscV2);  
         if (orscV3.nextPulse(p))
             reportSerial("OSV3", orscV3);        
-        if (cres.nextPulse(p))
-            reportSerial("CRES", cres);        
-        if (kaku.nextPulse(p))
-            reportSerial("KAKU", kaku);        
-        if (xrf.nextPulse(p))
-            reportSerial("XRF", xrf);        
-        if (hez.nextPulse(p))
-            reportSerial("HEZ", hez);        
+        //if (cres.nextPulse(p))
+        //    reportSerial("CRES", cres);        
+        //if (kaku.nextPulse(p))
+        //    reportSerial("KAKU", kaku);        
+       // if (xrf.nextPulse(p))
+        //    reportSerial("XRF", xrf);
+        //if (nexa.nextPulse(p))
+        //    reportSerial("NEXA", nexa);        
+     //   if (hez.nextPulse(p))
+      //      reportSerial("HEZ", hez);
     }
-
-    if (p != 0) {
-        if (viso.nextPulse(p))
-            reportSerial("VISO", viso);        
-        if (emx.nextPulse(p))
-            reportSerial("EMX", emx);        
-        if (ksx.nextPulse(p))
-            reportSerial("KSX", ksx);        
-        if (fsx.nextPulse(p))
-            reportSerial("FSX", fsx);        
-    }
+        
+    //if (p != 0) {
+    //    if (viso.nextPulse(p))
+    //        reportSerial("VISO", viso);        
+     //   if (emx.nextPulse(p))
+      //      reportSerial("EMX", emx);        
+     //   if (ksx.nextPulse(p))
+     //       reportSerial("KSX", ksx);        
+      //  if (fsx.nextPulse(p))
+  //          reportSerial("FSX", fsx);        
+//    }
+  
 }

@@ -430,63 +430,15 @@ public:
             byte w = width >= 600;
             gotBit(w);
         } else if (width >= 5000 && pos >= 5 /*&& 8 * pos + bits == 50*/) {
-            for (byte i = 0; i < 6; ++i) 
+            for (byte i = 0; i < 6; ++i)
                 gotBit(0);
-                alignTail(7); // keep last 56 bits
-          
+            alignTail(7); // keep last 56 bits
             return 1;
         } else
             return -1;
         return 0;
     }
 };
-
-class NexaDecoder : public DecodeOOK {
-public:
-    NexaDecoder () {}
-    byte prevBit;
-    
-     virtual void gotBit (byte value) {
-       int total = total_bits;
-        if (total % 2 == 1) {
-          if ((prevBit + value) != 1) { // Error check. Must Be 01 or 10
-              resetDecoder();
-              return;
-          }
-        
-           byte *ptr = data + pos;
-           *ptr = (*ptr >> 1) | (value << 7);
-        
-          if (++bits >= 8) {
-              bits = 0;
-              if (++pos >= sizeof data) {
-                  resetDecoder();
-                  return;
-              }
-          }
-        }
-        prevBit = value;
-        total_bits++;
-        state = OK;
-    }
-    
-    // see also http://homeeasyhacking.wikia.com/wiki/Home_Easy_Hacking_Wiki
-    virtual char decode (word width) {
-        if (200 <= width && width < 1750) {
-            byte w = width >= 600;
-            gotBit(w);
-        } else if (width >= 5000 && pos >= 5 /*&& 8 * pos + bits == 50*/) {
-            //for (byte i = 0; i < 6; ++i) 
-            //    gotBit(0);
-                //alignTail(7); // keep last 56 bits
-            return 1;
-        } else
-            return -1;
-        return 0;
-    }
-};
-
-
 
 // 868 MHz decoders
 
@@ -758,7 +710,7 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
     celsius= ((data[5]>>4) * 100)  + ((data[5] & 0x0F) * 10) + ((data[4] >> 4)); //11..8 11 is flag bit. 10..8 temp.
     if ((data[6] & 0x0F) >= 8) celsius=-celsius;
     int hum = ((data[7] & 0x0F)*10)+ (data[6] >> 4);
-    if ((data[2] & 0x0F) == 3)
+    if ((data[4] & 0x0F) == 4)
     {
       battery=0;
     }
@@ -823,7 +775,7 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
     int celsius= ((data[5]>>4) * 100)  + ((data[5] & 0x0F) * 10) + ((data[4] >> 4));
     if ((data[6] & 0x0F) >= 8) celsius=-celsius;
 
-   if ((data[4] & 0x0F) >= 4)
+   if ((data[4] & 0x0F) == 4)
     {
       battery=0;
     }
@@ -853,7 +805,8 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
      break;
     }    
     Serial.print ("ID") ;
-    Serial.print(data[4]); 
+    Serial.print(data[2] >> 4); 
+    Serial.print(data[3] & 0x0F); 
     Serial.print (" ") ;
     Serial.print(float(celsius)/10,1);
     Serial.print("%  Battery ");  
@@ -1068,11 +1021,7 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
     InTempBat=(10-(data[4] & 0x0F))*10;
     Serial.print(InTempBat);
     Serial.println("%");      
- }
- 
-//if 
- 
-    
+ }  
     decoder.resetDecoder();
 }
 
@@ -1111,8 +1060,8 @@ void loop () {
         //    reportSerial("XRF", xrf);
         //if (nexa.nextPulse(p))
         //    reportSerial("NEXA", nexa);        
-        //if (hez.nextPulse(p))
-        //    reportSerial("HEZ", hez);
+        if (hez.nextPulse(p))
+            reportSerial("HEZ", hez);
     }
         
     //if (p != 0) {

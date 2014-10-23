@@ -440,6 +440,28 @@ public:
     }
 };
 
+class NexaDecoder : public DecodeOOK {
+public:
+    NexaDecoder () {}
+  
+    // see also http://homeeasyhacking.wikia.com/wiki/Home_Easy_Hacking_Wiki
+    virtual char decode (word width) {
+        if (200 <= width && width < 1800) {
+            byte w = width <= 900;
+            gotBit(w);
+        } else if (width >= 5000 && pos >= 5 /*&& 8 * pos + bits == 50*/) {
+            //for (byte i = 0; i < 6; ++i)
+            //    gotBit(0);
+            //alignTail(7); // keep last 56 bits
+            return 1;
+        } else if (width >= 1800) {
+          state = OK;
+        } else
+            return -1;
+        return 0;
+    }
+};
+
 // 868 MHz decoders
 
 class VisonicDecoder : public DecodeOOK {
@@ -599,7 +621,7 @@ OregonDecoderV3 orscV3;
 //KakuDecoder kaku;
 //XrfDecoder xrf;
 HezDecoder hez;
-//NexaDecoder nexa;
+NexaDecoder nexa;
 //VisonicDecoder viso;
 //EMxDecoder emx;
 //KSxDecoder ksx;
@@ -1058,8 +1080,8 @@ void loop () {
         //    reportSerial("KAKU", kaku);        
        // if (xrf.nextPulse(p))
         //    reportSerial("XRF", xrf);
-        //if (nexa.nextPulse(p))
-        //    reportSerial("NEXA", nexa);        
+        if (nexa.nextPulse(p))
+            reportSerial("NEXA", nexa);        
         if (hez.nextPulse(p))
             reportSerial("HEZ", hez);
     }

@@ -91,7 +91,7 @@ byte Reverse(byte b)
 
 class DecodeOOK {
 protected:
-  byte  bits, flip, state, pos, data[25];
+  byte bits, flip, state, pos, data[25];
   int counter;
   virtual char decode (word width) =0;
 
@@ -534,24 +534,34 @@ public:
     prevBit = 0;
     i = 0;
   }
+  
+   virtual void gotBitn (char value) {
+    total_bits++;
+    bitWrite(data[pos], bits, value);
+    if (++bits >= 8) {
+      bits = 0;
+      if (++pos >= sizeof data) {
+        resetDecoder();
+        return;
+      }
+    }
+    state = OK;
+  }
 
   virtual char decode (word width) {
-    if (1500 <= width && width < 6000) {
-      byte w = width >= 3000;
-       gotBit(w);
-    } 
-    //else if (width >= 5000 && pos >= 5 /*&& 8 * pos + bits == 50*/) {
-      else if (width >= 8000 && pos > 20) { //&& pos > 21 && pos < 23 ) {
-      //for (byte i = 0; i < 6; ++i)
-      //    gotBit(0);
-      //alignTail(7); // keep last 56 bits
+    if (1800 <= width && width < 4200) {
+      if (width > 1900 && width < 2100) {
+        gotBitn(0);
+      } else if (width > 3800  && width < 4000) {
+        gotBitn(1);
+      }
+    } else if (width >= 8000 && width <= 11000 && 8 * pos + bits == 37) {
       return 1;
-    } 
-    else if (width >= 1800) {
+    } else if (width >= 300 && width < 1000) {
       state = OK;
-    } 
-    else
+    } else {
       return -1;
+    }
     return 0;
   }
 };
@@ -760,7 +770,9 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
   Serial.print(decoder.total_bits);
   Serial.print(' ');
   for (byte i = 0; i < pos; ++i) {
-    Serial.print(data[i] >> 4, HEX);
+     Serial.print(data[i] >> 4, HEX);
+    //Serial.print(GetNibble(i, data), HEX);
+    //Serial.print(GetNibble(i+1, data), HEX);
     //Serial.print(data[i]);
     Serial.print(data[i] & 0x0F, HEX);
     Serial.print(' ');

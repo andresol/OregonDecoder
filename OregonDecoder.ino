@@ -535,9 +535,9 @@ public:
     i = 0;
   }
   
-   virtual void gotBitn (char value) {
+   virtual void gotBit (char value) {
     total_bits++;
-    bitWrite(data[pos], bits, value);
+    bitWrite(data[pos], 7-bits, value);
     if (++bits >= 8) {
       bits = 0;
       if (++pos >= sizeof data) {
@@ -551,9 +551,9 @@ public:
   virtual char decode (word width) {
     if (1800 <= width && width < 4200) {
       if (width > 1900 && width < 2100) {
-        gotBitn(0);
+        gotBit(0);
       } else if (width > 3800  && width < 4000) {
-        gotBitn(1);
+        gotBit(1);
       }
     } else if (width >= 8000 && width <= 11000 && 8 * pos + bits == 37) {
       return 1;

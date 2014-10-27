@@ -512,7 +512,17 @@ public:
 };
 
 /**
-  1 
+
+  Message is sent 7 times in repeate. 36x9. 
+  9 nibles: 
+  
+  95 40 0e 3c c : 10010101 01000000 00001110 00111100 1100
+  1001: Always 1001. ID for sensor 9
+  0101 0100 = RandomID 5 4
+  0000: 0 battery. 1 ok, 1 pressed button, 00= channel from 1-3 
+  temp: 12 bits. 0e3 = 227 = 22.7C if 1e3 = -22.7c
+  hum0: 1100 = no humidity c
+  hum1: 1100 = no humidity  c
 */
 class Prologue : 
 public DecodeOOK { 

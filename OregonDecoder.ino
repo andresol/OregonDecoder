@@ -511,6 +511,9 @@ public:
   }
 };
 
+/**
+  1 
+*/
 class Prologue : 
 public DecodeOOK { 
   private:
@@ -523,18 +526,13 @@ public:
   }
 
   virtual char decode (word width) {
-    if (200 <= width && width < 2200) {
-      if (width <= 600) {
-         gotBit(1);
-      }
-      if (width > 1400) {
-           gotBit(0);
-      }
-      
+    if (1500 <= width && width < 6000) {
+      byte w = width >= 3000;
+       gotBit(w);
     } 
     //else if (width >= 5000 && pos >= 5 /*&& 8 * pos + bits == 50*/) {
-      else if (width >= 5000 && pos > 20) { //&& pos > 21 && pos < 23 ) {
-      for (byte i = 0; i < 6; ++i)
+      else if (width >= 8000 && pos > 20) { //&& pos > 21 && pos < 23 ) {
+      //for (byte i = 0; i < 6; ++i)
       //    gotBit(0);
       //alignTail(7); // keep last 56 bits
       return 1;

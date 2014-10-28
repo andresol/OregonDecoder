@@ -480,6 +480,7 @@ public:
   }
 };
 
+// 0 is about 250 micros. 1 is about 1250
 class NexaDecoder : 
 public DecodeOOK { 
   private:
@@ -492,20 +493,20 @@ public:
   }
 
   virtual char decode (word width) {
-    if (200 <= width && width < 1800) {
-      byte w = width <= 900;
+    if (150 <= width && width < 1350) {
+      char w = width >= 700;
       if (i % 2 == 1) {
          if ((prevBit + w) != 1) { // Error check. Must Be 01 or 10
                 i = 0;
                 //return -1;
             }
-       gotBit(w);
+       gotBitR(w);
       }
       prevBit = w;
       i++;
     } 
     //else if (width >= 5000 && pos >= 5 /*&& 8 * pos + bits == 50*/) {
-      else if (width >= 5000 && pos == 12 ) {
+      else if (width >= 8000 && pos >=5 ) {
         //for (byte i = 0; i < 6; ++i)
       //    gotBit(0);
       //alignTail(7); // keep last 56 bits
@@ -758,6 +759,7 @@ void reportSerial (const char* type, class DecodeOOK& decoder) {
   unsigned int watts;
   const byte* data = decoder.getData(pos);
   Serial.print(type);
+  Serial.print(' ');
   lastValue = type;
   for (byte i = 0; i < pos; ++i) {
     Serial.print(data[i] >> 4, HEX);
@@ -768,10 +770,10 @@ void reportSerial (const char* type, class DecodeOOK& decoder) {
 
   if (type == "PRO" && data[0] >> 4 == 0x9) {
     Serial.print("Prologue ");
-    celsius= ((data[2]>>4) * 100)  + ((data[2] & 0x0F) * 10) + ((data[3] >> 4));
-    if ((data[2] >> 7)) celsius=-celsius;
+    celsius = (((data[2] >> 4) << 8) & 0x700) | (((data[2] & 0x0F)<<4) & 0xF0) | ((data[3] >> 4) & 0xF);
+    //if ((data[2] >> 7)) celsius=-celsius;
     Serial.print(" ");
-    Serial.print(celsius);
+    Serial.print(float(celsius)/10,1);
     Serial.println("C ");
   }
 

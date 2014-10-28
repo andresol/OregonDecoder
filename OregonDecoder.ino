@@ -133,12 +133,24 @@ public:
   }
 
   // add one bit to the packet data buffer
-
   virtual void gotBit (char value) {
     total_bits++;
     byte *ptr = data + pos;
     *ptr = (*ptr >> 1) | (value << 7);
 
+    if (++bits >= 8) {
+      bits = 0;
+      if (++pos >= sizeof data) {
+        resetDecoder();
+        return;
+      }
+    }
+    state = OK;
+  }
+  
+   virtual void gotBitR (char value) {
+    total_bits++;
+    bitWrite(data[pos], 7-bits, value);
     if (++bits >= 8) {
       bits = 0;
       if (++pos >= sizeof data) {
@@ -195,15 +207,13 @@ public:
   }
 };
 
+
 // 433 MHz decoders
-
-
 class OregonDecoderV2 : 
 public DecodeOOK {
 public:
   OregonDecoderV2() {
   }
-
   // add one bit to the packet data buffer
   virtual void gotBit (char value) {
     if(!(total_bits & 0x01))
@@ -419,7 +429,6 @@ public:
   XrfDecoder () {
   }
 
-  // see also http://davehouston.net/rf.htm
   virtual char decode (word width) {
     if (width > 2000 && pos >= 4)
       return 1;
@@ -512,7 +521,8 @@ public:
 };
 
 /**
-
+  Clas Ohlson sensors.
+  
   Message is sent 7 times in repeate. 36x9. 
   9 nibles: 
   
@@ -534,26 +544,12 @@ public:
     prevBit = 0;
     i = 0;
   }
-  
-   virtual void gotBit (char value) {
-    total_bits++;
-    bitWrite(data[pos], 7-bits, value);
-    if (++bits >= 8) {
-      bits = 0;
-      if (++pos >= sizeof data) {
-        resetDecoder();
-        return;
-      }
-    }
-    state = OK;
-  }
-
   virtual char decode (word width) {
     if (1800 <= width && width < 4200) {
       if (width > 1900 && width < 2100) {
-        gotBit(0);
+        gotBitR(0);
       } else if (width > 3800  && width < 4000) {
-        gotBit(1);
+        gotBitR(1);
       }
     } else if (width >= 8000 && width <= 11000 && 8 * pos + bits == 37) {
       return 1;
@@ -757,66 +753,28 @@ void rupt (void) {
   last += pulse;
 }
 
-void reportSerial (const char* s, class DecodeOOK& decoder) {
+void reportSerial (const char* type, class DecodeOOK& decoder) {
   byte pos;
   unsigned int watts;
   const byte* data = decoder.getData(pos);
-  Serial.print(s);
-  lastValue = s;
-  Serial.print(" Pos:");
-  Serial.print(pos);
-  Serial.print(' ');
-  Serial.print(" Total:");
-  Serial.print(decoder.total_bits);
-  Serial.print(' ');
+  Serial.print(type);
+  lastValue = type;
   for (byte i = 0; i < pos; ++i) {
-     Serial.print(data[i] >> 4, HEX);
-    //Serial.print(GetNibble(i, data), HEX);
-    //Serial.print(GetNibble(i+1, data), HEX);
-    //Serial.print(data[i]);
+    Serial.print(data[i] >> 4, HEX);
     Serial.print(data[i] & 0x0F, HEX);
     Serial.print(' ');
   }
-  //if (pos > 5) {
-  //  Serial.print('\t');
-  //  watts = ((data[4] * 256) + (data[3] & 0xF0)) * 1.006196884; 
-  //  Serial.print(watts);
-  //}
-  // Serial.print(' ');
-  // Serial.print(millis() / 1000);
-
   Serial.println();
-  //General note where possible, values multiplied by 10 to give integers to 1 dcimal point when divided by 10 later.  Less memory hungry.
 
-  // OWL Electricty Meter
-  //  if (data[0] == 0x06 && data[1] == 0xC8) {
-  //    Serial.print("Current ");
-  //    PowerNow = (data[3] + ((data[4] & 0x03)*256));
-  //    Serial.print(float(PowerNow)/10,1);
-  //    Serial.println("amps"); 
-  //    float ActualPower = Duration * ((PowerNow * 240 * PF)/36000.0);
-  //    if (ActualPower < 0) ActualPower = -ActualPower;
-  //    if (ActualPower > 0) {  
-  //      TotalPowerHr += ActualPower; //W/s
-  //      TotalPower24 += ActualPower; //W/s
-  //      YearData.TotalPowerY += ActualPower;
-  //      PreviousTime = now.unixtime();
-  //      PowerTime = now.unixtime();
-  //     Serial.print("Added... ");
-  //      Serial.print(ActualPower);
-  //      Serial.print("W (over ");
-  //    }
-  //    Serial.print(Duration);
-  //    Serial.print(" seconds). Total Today ");
-  //    Serial.print(TotalPower24,0);
-  //    Serial.println("W/hs ");
-  //Check Extremes
-  //    if (PowerNow > MaxPower24 && PowerNow != -999) {
-  //      MaxPower24 = PowerNow;
-  //    }
-  //  }
+  if (type == "PRO" && data[0] >> 4 == 0x9) {
+    Serial.print("Prologue ");
+    celsius= ((data[2]>>4) * 100)  + ((data[2] & 0x0F) * 10) + ((data[3] >> 4));
+    if ((data[2] >> 7)) celsius=-celsius;
+    Serial.print(" ");
+    Serial.print(celsius);
+    Serial.println("C ");
+  }
 
-  //UV138 is 0xEA && 0X7C
 
   if (data[0] == 0xEA && data[1] == 0x7C) {
     Serial.print("UV ");
@@ -844,11 +802,7 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
 
 
   //(THGR228N, THGR122X,  )Inside Temp-Hygro
-
-
-  if (data[0] == 0x1A && data[1] == 0x2D || data[0] == 0x1D && data[1] == 0x20 || data[0] == 0xFA && data[1] == 0x28) 
-
-  {
+  if (data[0] == 0x1A && data[1] == 0x2D || data[0] == 0x1D && data[1] == 0x20 || data[0] == 0xFA && data[1] == 0x28) {
 
     int battery=0;
     celsius= ((data[5]>>4) * 100)  + ((data[5] & 0x0F) * 10) + ((data[4] >> 4)); //11..8 11 is flag bit. 10..8 temp.
@@ -891,17 +845,9 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
     Serial.print(data[2] >> 4); 
     Serial.print(data[3] & 0x0F); 
     Serial.print (" ") ;
-    //Serial.print(" ");
-    //Serial.print(data[2]);
-    //Serial.print(" ");
-    //Serial.print("Temp: ");
     Serial.print(float(celsius)/10,1);
-    //Serial.println(" c");
-    //Serial.print(hum);
-    // Serial.print("Temp: ");
-    // Serial.print(float(CH3TempNow)/10,1);
     Serial.print("C  Humidity ");
-    Serial.print(CH3HumNow);
+    Serial.print(hum);
     Serial.print("%  Battery ");  
     Serial.print(battery);
     Serial.println("%");      
@@ -909,22 +855,15 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
 
 
   //THN122N Inside Temp
-
-
-  if (data[0] == 0xEA && data[1] == 0x4c) 
-
-  {
+  if (data[0] == 0xEA && data[1] == 0x4c) {
 
     int battery=0;
     int celsius= ((data[5]>>4) * 100)  + ((data[5] & 0x0F) * 10) + ((data[4] >> 4));
     if ((data[6] & 0x0F) >= 8) celsius=-celsius;
 
-    if ((data[4] & 0x0F) == 4)
-    {
+    if ((data[4] & 0x0F) == 4) {
       battery=0;
-    }
-    else
-    {
+    } else {
       battery=100;
     }   
     Serial.print("THN122N found ");
@@ -960,12 +899,10 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
 
 
   //  Annometer
-  if (data[0] == 0x3A && data[1] == 0x0D || data[0] == 0x19 && data[1] == 0x84 || data[0] == 0x19 && data[1] == 0x94 || data[0] == 0x1A && data[1] == 0x89) 
-  {
+  if (data[0] == 0x3A && data[1] == 0x0D || data[0] == 0x19 && data[1] == 0x84 || data[0] == 0x19 && data[1] == 0x94 || data[0] == 0x1A && data[1] == 0x89) {
     //Checksum - add all nibbles from 0 to 8, subtract A and compare to byte 9, should = 0
     int cs = 0;
-    for (byte i = 0; i < pos-1; ++i) 
-    { 
+    for (byte i = 0; i < pos-1; ++i) { 
       //all but last byte
       cs += data[i] >> 4;
       cs += data[i] & 0x0F;
@@ -976,8 +913,7 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
     //    Serial.print(csc); 
     //    Serial.print(" vs ");   
     //    Serial.println(cs); 
-    if (cs == csc)
-    { 
+    if (cs == csc){ 
       //if checksum is OK
       Serial.print ("ID") ;
       Serial.print(data[2] >> 4); 
@@ -1003,25 +939,8 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
 
 
   // Rain Guage 
-  if (data[0] == 0x2A && data[1] == 0x1D || data[0] == 0x2D && data[1] == 0x10 || data[0] == 0x29 && data[1] == 0x14 || data[0] == 0x2A && data[1] == 0x19) 
-  {
-    //Checksum - add all nibbles from 0 to 8, subtract 9 and compare, should = 0
-    //    Serial.print(" - ");
-    //   int cs = 0;
-    //    for (byte i = 0; i < pos-1; ++i) 
-    //    { 
-    //all but last byte
-    //        cs += data[i] >> 4;
-    //        cs += data[i] & 0x0F;
-    //    }
-    //    int csc = (data[8] >> 4) + ((data[9] & 0x0F));    
-    //    cs -= 10;      //my version as A fails?
-    //    Serial.print(csc); 
-    //    Serial.print(" vs ");   
-    //    Serial.println(cs);
-    //    if (cs == csc)
-    //   { 
-    //if checksum is OK      
+  if (data[0] == 0x2A && data[1] == 0x1D || data[0] == 0x2D && data[1] == 0x10 || data[0] == 0x29 && data[1] == 0x14 || data[0] == 0x2A && data[1] == 0x19) {
+   
     Serial.print("Rain Guage found ");
     Serial.print ("ID") ;
     Serial.print(data[2] >> 4); 
@@ -1032,20 +951,6 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
     Serial.print(RainRateNow);
     Serial.print("mm/hr  Total ");
     int RainTotal = ((data[7]  >> 4) * 10)  + (data[6]>>4);
-
-    //     if (RainTotal != OldRainTotal)
-    //     {
-    //        if (RainNewFlag == false)
-    //        {  
-    //Stops 1st reading going through and giving additonal values
-    //          TotalRainFrom0000 += 1;
-    //          TotalRainHour += 1;
-    //          YearData.TotalRainY += 1;
-    //          SendEmail(2);
-    //        }
-    //       OldRainTotal=RainTotal;
-    //       RainNewFlag=false;
-    //      }
     Serial.print(TotalRainFrom0000);   
     Serial.print(" ");
     Serial.print(RainTotal); 
@@ -1110,8 +1015,7 @@ void reportSerial (const char* s, class DecodeOOK& decoder) {
 
 
   //(BTHR918, BTHR968) Temp-Hygro-Baro
-  if (data[0] == 0x5A && data[1] == 0x5D || data[0] == 0x5D && data[1] == 0x60  || data[0] == 0x5A && data[1] == 0x6D) 
-  {
+  if (data[0] == 0x5A && data[1] == 0x5D || data[0] == 0x5D && data[1] == 0x60  || data[0] == 0x5A && data[1] == 0x6D) {
     Serial.print("Indoor temperature ");
     Serial.print ("ID") ;
     Serial.print(data[2] >> 4); 
@@ -1189,8 +1093,6 @@ void loop () {
   pulse = 0;
   interrupts();
 
-  //if (p != 0){ Serial.print(++i); Serial.print('\n');}
-
   if (p != 0) {
     if (orscV2.nextPulse(p))
       reportSerial("OSV2", orscV2);  
@@ -1216,18 +1118,8 @@ void loop () {
       reportSerial("FSX", fsx);   
     if (pro.nextPulse(p))
       reportSerial("PRO", pro);        
-    //    }
   }
 
-  //if (p != 0) {
-  //    if (viso.nextPulse(p))
-  //        reportSerial("VISO", viso);        
-  //   if (emx.nextPulse(p))
-  //      reportSerial("EMX", emx);        
-  //   if (ksx.nextPulse(p))
-  //       reportSerial("KSX", ksx);        
-  //  if (fsx.nextPulse(p))
-  //          reportSerial("FSX", fsx);        
-  //    }
+
 
 }

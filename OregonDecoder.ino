@@ -4,6 +4,10 @@
 // 2010-04-11 <jcw@equi4.com> http://opensource.org/licenses/mit-license.php
 // $Id: ookDecoder.pde 5331 2010-04-17 10:45:17Z jcw $
 
+//#define DEBUG 0
+#define TEST 0
+
+#define PORT 2
 
 int UVNow=-999;
 int UVBat=100;
@@ -493,7 +497,7 @@ public:
   }
 
   virtual char decode (word width) {
-    if (150 <= width && width < 1350) {
+    if (175 <= width && width < 1325) {
       char w = width >= 700;
       if (i % 2 == 1) {
          if ((prevBit + w) != 1) { // Error check. Must Be 01 or 10
@@ -506,7 +510,7 @@ public:
       i++;
     } 
     //else if (width >= 5000 && pos >= 5 /*&& 8 * pos + bits == 50*/) {
-      else if (width >= 8000 && pos >=5 ) {
+      else if (width >= 8000 && pos >=11 ) {
         //for (byte i = 0; i < 6; ++i)
       //    gotBit(0);
       //alignTail(7); // keep last 56 bits
@@ -742,8 +746,6 @@ KSxDecoder ksx;
 FSxDecoder fsx;
 Prologue pro;
 
-#define PORT 2
-
 volatile word pulse;
 
 void rupt (void) {
@@ -754,10 +756,27 @@ void rupt (void) {
   last += pulse;
 }
 
+void reportSerialNexa (const char* type, class DecodeOOK& decoder) {
+  unsigned long unique;
+  int group;
+  int on;
+  byte pos;
+  unsigned int unit;
+  const byte* data = decoder.getData(pos);
+   for (byte i = 0; i < pos; ++i) {
+    Serial.print(data[i] >> 4, HEX);
+    Serial.print(data[i] & 0x0F, HEX);
+    Serial.print(' ');
+  }
+  //memcpy(data, &unique, 52);
+  //0xFFFFFFFFFFFFF
+}
+
 void reportSerial (const char* type, class DecodeOOK& decoder) {
   byte pos;
   unsigned int watts;
   const byte* data = decoder.getData(pos);
+#if defined(DEBUG)
   Serial.print(type);
   Serial.print(' ');
   lastValue = type;
@@ -767,7 +786,7 @@ void reportSerial (const char* type, class DecodeOOK& decoder) {
     Serial.print(' ');
   }
   Serial.println();
-
+#endif
   if (type == "PRO" && data[0] >> 4 == 0x9) {
     Serial.print("Prologue ");
     celsius = (((data[2] >> 4) << 8) & 0x700) | (((data[2] & 0x0F)<<4) & 0xF0) | ((data[3] >> 4) & 0xF);
@@ -1107,7 +1126,7 @@ void loop () {
     if (xrf.nextPulse(p))
       reportSerial("XRF", xrf);
     if (nexa.nextPulse(p))
-        reportSerial("NEXA", nexa);        
+        reportSerialNexa("NEXA", nexa);        
     if (hez.nextPulse(p))
       reportSerial("HEZ", hez);
     if (viso.nextPulse(p))

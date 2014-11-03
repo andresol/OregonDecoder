@@ -768,8 +768,14 @@ void reportSerialNexa (const char* type, class DecodeOOK& decoder) {
     Serial.print(data[i] & 0x0F, HEX);
     Serial.print(' ');
   }
-  //memcpy(data, &unique, 52);
-  //0xFFFFFFFFFFFFF
+  Serial.print("Nexa: ");
+  if (pos >= 8) {
+    //memcpy(&data, &unique, 7);
+    //Serial.print("Unique ");
+    //Serial.println(unique >> 4, BIN);
+  }
+ 
+  decoder.resetDecoder();
 }
 
 void reportSerial (const char* type, class DecodeOOK& decoder) {

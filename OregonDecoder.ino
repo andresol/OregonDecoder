@@ -502,21 +502,16 @@ public:
       if (i % 2 == 1) {
          if ((prevBit + w) != 1) { // Error check. Must Be 01 or 10
                 i = 0;
-                //return -1;
-            }
-       gotBitR(w);
+         }
+         gotBitR(w);
       }
       prevBit = w;
       i++;
     } 
-    //else if (width >= 5000 && pos >= 5 /*&& 8 * pos + bits == 50*/) {
-      else if (width >= 8000 && pos >=11 ) {
-        //for (byte i = 0; i < 6; ++i)
-      //    gotBit(0);
-      //alignTail(7); // keep last 56 bits
+      else if (width >= 9000 && pos >=11 ) {
       return 1;
     } 
-    else if (width >= 1800) {
+    else if (width >= 2400) {
       state = OK;
     } 
     else
@@ -774,7 +769,7 @@ void reportSerialNexa (const char* type, class DecodeOOK& decoder) {
     //Serial.print("Unique ");
     //Serial.println(unique >> 4, BIN);
   }
- 
+  Serial.println(' ');
   decoder.resetDecoder();
 }
 

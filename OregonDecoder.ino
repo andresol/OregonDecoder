@@ -7,6 +7,19 @@
 //#define DEBUG 0
 #define TEST 0
 
+#define NEXA_T 250 //Protocol length
+#define SLACK 50
+#define PACKET_SIZE 64
+#define WAIT_TIME 100
+#define TIMEOUT 100
+
+//BITS
+#define ZERO 0
+#define ONE 1
+#define SYNC 2
+#define PAUSE 3
+#define ERR 4
+
 #define PORT 2
 
 int UVNow=-999;
@@ -484,39 +497,66 @@ public:
   }
 };
 
-// 0 is about 250 micros. 1 is about 1250
+// 1 is about 250 micros. 0 is about 1250
 class NexaDecoder : 
 public DecodeOOK { 
   private:
     byte prevBit;
+    byte b;
     int i;
+    int j;
 public:
   NexaDecoder () {
     prevBit = 0;
-    i = 0;
+    b = 0;
+    reset();
   }
+  
+  void reset() {
+    i = 0;
+    j = 1;
+  }
+  
+  int getBitType(word t) {
+     if (t > (NEXA_T - (SLACK * 2)) && t < (NEXA_T + (SLACK * 3))) {
+       return ZERO;
+     } else if (t > (NEXA_T * 3) && t < (NEXA_T * 7)) {
+       return ONE;
+     } else if (t > (NEXA_T * 30) && (t < NEXA_T * 50)) {
+       return PAUSE;
+     } else if (t > (NEXA_T * 7) && (t < NEXA_T * 13)) {
+       return SYNC;
+     } else {
+       return ERR;
+     }
+}
 
   virtual char decode (word width) {
-    if (175 <= width && width < 1325) {
-      char w = width >= 700;
-      if (i % 2 == 1) {
-         if ((prevBit + w) != 1) { // Error check. Must Be 01 or 10
-                i = 0;
+     b = getBitType(width);
+     if (b <= ONE) { //TODO: Switch
+       if (i % 2 == 1) {
+         if (j % 2 == 1) {
+            if ((prevBit | b) != 1) { // Error check. Must Be 01 or 10
+             //return -1;
+            }
+           gotBitR(prevBit);
          }
-         gotBitR(w);
-      }
-      prevBit = w;
-      i++;
-    } 
-      else if (width >= 9000 && pos >=11 ) {
-      return 1;
-    } 
-    else if (width >= 2400) {
-      state = OK;
-    } 
-    else
-      return -1;
-    return 0;
+         prevBit = b;
+         j++;
+       }
+        ++i;
+        return 0;
+     } else if (b == SYNC) {
+       reset();
+       state = OK;
+       return 0;
+     } else if (b == PAUSE && j == 65) {
+       reset();
+       return 1;
+     } else {
+      reset();
+       return -1;
+     }
   }
 };
 
@@ -752,24 +792,61 @@ void rupt (void) {
 }
 
 void reportSerialNexa (const char* type, class DecodeOOK& decoder) {
-  unsigned long unique;
-  int group;
-  int on;
-  byte pos;
-  unsigned int unit;
+  unsigned long unique = 0;
+  int group = 0;
+  int on = 0;
+  byte pos = 0;
+  unsigned int unit = 0;
   const byte* data = decoder.getData(pos);
    for (byte i = 0; i < pos; ++i) {
-    Serial.print(data[i] >> 4, HEX);
-    Serial.print(data[i] & 0x0F, HEX);
+    Serial.print(data[i] >> 4, BIN);
+    Serial.print(data[i] & 0x0F, BIN);
     Serial.print(' ');
   }
+  Serial.println();
   Serial.print("Nexa: ");
-  if (pos >= 8) {
-    //memcpy(&data, &unique, 7);
-    //Serial.print("Unique ");
-    //Serial.println(unique >> 4, BIN);
+  if (pos != 4) {
+    Serial.println();
+    decoder.resetDecoder();
+    return;
+  } else {
+    int index = 0;
+    for (int i = 0; i < pos; i++) {
+      for (int j = 0; j < 8; j++) {
+        if (index < 26) {
+          bitWrite(unique, 26-index, bitRead(data[i], 7-j));
+        } else if (index == 26) {
+           bitWrite(group, 0, bitRead(data[i], 7-j));
+        } else if (index == 27) {
+           bitWrite(on, 0, bitRead(data[i], 7-j));
+        } else if (index < 29) {
+           bitWrite(pos, 29-index, bitRead(data[i], 7-j));
+        } else if (index < 32) { 
+          bitWrite(unit, 31-index, bitRead(data[i], 7-j));
+        }
+        index++;
+      }
+    }
+    
   }
-  Serial.println(' ');
+    Serial.print("Unique key ");
+    Serial.println(unique);
+     Serial.println(unique, BIN);
+
+    if (group) {
+         Serial.println("All commands");
+    } else {
+       Serial.print("Unit ");
+       Serial.println(unit);
+    }
+    
+    if (on) {
+         Serial.println("On");
+    } else {
+         Serial.println("Off");
+    }
+  
+  Serial.println();
   decoder.resetDecoder();
 }
 
@@ -1145,3 +1222,4 @@ void loop () {
 
 
 }
+

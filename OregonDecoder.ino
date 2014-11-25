@@ -502,20 +502,19 @@ class NexaDecoder :
 public DecodeOOK { 
   private:
     byte prevBit;
-    int start;
     byte b;
     int i;
-
+    int j;
 public:
   NexaDecoder () {
     prevBit = 0;
     b = 0;
-    start = 0;
     reset();
   }
   
   void reset() {
     i = 0;
+    j = 1;
   }
   
   int getBitType(word t) {
@@ -534,28 +533,24 @@ public:
 
   virtual char decode (word width) {
      b = getBitType(width);
-     if (start == 0 && b == ZERO) {
-       start += 1;
-       return 0;
-     } else if (start == 0 && b != ZERO) {
-       Serial.println("err");
-     }
-     start == 0;
      if (b <= ONE) { //TODO: Switch
        if (i % 2 == 1) {
+         if (j % 2 == 1) {
             if ((prevBit | b) != 1) { // Error check. Must Be 01 or 10
              //return -1;
             }
            gotBitR(prevBit);
          }
-        prevBit = b;
+         prevBit = b;
+         j++;
+       }
         ++i;
         return 0;
      } else if (b == SYNC) {
        reset();
        state = OK;
        return 0;
-     } else if (b == PAUSE) {
+     } else if (b == PAUSE && j == 65) {
        reset();
        return 1;
      } else {
@@ -804,7 +799,8 @@ void reportSerialNexa (const char* type, class DecodeOOK& decoder) {
   unsigned int unit = 0;
   const byte* data = decoder.getData(pos);
    for (byte i = 0; i < pos; ++i) {
-    Serial.print(data[i], BIN);
+    Serial.print(data[i] >> 4, BIN);
+    Serial.print(data[i] & 0x0F, BIN);
     Serial.print(' ');
   }
   Serial.println();
@@ -818,14 +814,14 @@ void reportSerialNexa (const char* type, class DecodeOOK& decoder) {
     for (int i = 0; i < pos; i++) {
       for (int j = 0; j < 8; j++) {
         if (index < 26) {
-          bitWrite(unique, 25-index, bitRead(data[i], 7-j));
+          bitWrite(unique, 26-index, bitRead(data[i], 7-j));
         } else if (index == 26) {
            bitWrite(group, 0, bitRead(data[i], 7-j));
         } else if (index == 27) {
            bitWrite(on, 0, bitRead(data[i], 7-j));
         } else if (index < 29) {
-           bitWrite(pos, 30-index, bitRead(data[i], 7-j));
-        } else if (index < 31) { 
+           bitWrite(pos, 29-index, bitRead(data[i], 7-j));
+        } else if (index < 32) { 
           bitWrite(unit, 31-index, bitRead(data[i], 7-j));
         }
         index++;
@@ -1222,5 +1218,8 @@ void loop () {
     if (pro.nextPulse(p))
       reportSerial("PRO", pro);        
   }
+
+
+
 }
 

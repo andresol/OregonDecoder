@@ -533,7 +533,7 @@ public:
 
   virtual char decode (word width) {
      b = getBitType(width);
-     if (b <= ONE) { //TODO: Switch
+     if (b <= ONE && state == OK) { //TODO: Switch
        if (i % 2 == 1) {
          if (j % 2 == 1) {
             if ((prevBit | b) != 1) { // Error check. Must Be 01 or 10
@@ -550,7 +550,7 @@ public:
        reset();
        state = OK;
        return 0;
-     } else if (b == PAUSE && j == 65) {
+     } else if (b == PAUSE && i > 10 ) {
        reset();
        return 1;
      } else {
@@ -794,13 +794,14 @@ void rupt (void) {
 void reportSerialNexa (const char* type, class DecodeOOK& decoder) {
   unsigned long unique = 0;
   int group = 0;
-  int on = 0;
+  int off = 0;
   byte pos = 0;
+  unsigned int chan = 0;
   unsigned int unit = 0;
   const byte* data = decoder.getData(pos);
    for (byte i = 0; i < pos; ++i) {
-    Serial.print(data[i] >> 4, BIN);
-    Serial.print(data[i] & 0x0F, BIN);
+    Serial.print(data[i] >> 4, HEX);
+    Serial.print(data[i] & 0x0F, HEX);
     Serial.print(' ');
   }
   Serial.println();
@@ -809,41 +810,28 @@ void reportSerialNexa (const char* type, class DecodeOOK& decoder) {
     Serial.println();
     decoder.resetDecoder();
     return;
-  } else {
-    int index = 0;
-    for (int i = 0; i < pos; i++) {
-      for (int j = 0; j < 8; j++) {
-        if (index < 26) {
-          bitWrite(unique, 26-index, bitRead(data[i], 7-j));
-        } else if (index == 26) {
-           bitWrite(group, 0, bitRead(data[i], 7-j));
-        } else if (index == 27) {
-           bitWrite(on, 0, bitRead(data[i], 7-j));
-        } else if (index < 29) {
-           bitWrite(pos, 29-index, bitRead(data[i], 7-j));
-        } else if (index < 32) { 
-          bitWrite(unit, 31-index, bitRead(data[i], 7-j));
-        }
-        index++;
-      }
-    }
+  } 
+    unique = 1;
+    group = data[3] & 0x10;
+    off = data[3] & 0x8;
+    chan = data[3] & 0xc;
+    unit = data[3] & 0x3;
     
-  }
     Serial.print("Unique key ");
     Serial.println(unique);
-     Serial.println(unique, BIN);
+    Serial.println(unique, BIN);
 
-    if (group) {
+    if (!group) {
          Serial.println("All commands");
     } else {
        Serial.print("Unit ");
-       Serial.println(unit);
+       Serial.println(unit, BIN);
     }
     
-    if (on) {
-         Serial.println("On");
-    } else {
+    if (off) {
          Serial.println("Off");
+    } else {
+         Serial.println("On");
     }
   
   Serial.println();

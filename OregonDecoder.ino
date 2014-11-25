@@ -811,7 +811,10 @@ void reportSerialNexa (const char* type, class DecodeOOK& decoder) {
     decoder.resetDecoder();
     return;
   } 
-    unique = 1;
+    unique = data[0];
+    unique = (unique << 8) | data[1];
+    unique = (unique << 8) | data[2];
+    unique = (unique << 2) | (data[3] & 0xC0);
     group = data[3] & 0x10;
     off = data[3] & 0x8;
     chan = data[3] & 0xc;

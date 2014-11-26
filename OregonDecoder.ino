@@ -514,7 +514,7 @@ public:
   
   void reset() {
     i = 0;
-    j = 1;
+    j = 0;
   }
   
   int getBitType(word t) {
@@ -537,7 +537,9 @@ public:
        if (i % 2 == 1) {
          if (j % 2 == 1) {
             if ((prevBit | b) != 1) { // Error check. Must Be 01 or 10
-             //return -1;
+            Serial.println(i);
+            Serial.println(j);
+             return -1;
             }
            gotBitR(prevBit);
          }
@@ -794,17 +796,19 @@ void rupt (void) {
 void reportSerialNexa (const char* type, class DecodeOOK& decoder) {
   unsigned long unique = 0;
   int group = 0;
-  int off = 0;
+  int on = 0;
   byte pos = 0;
   unsigned int chan = 0;
   unsigned int unit = 0;
   const byte* data = decoder.getData(pos);
+  #if defined(DEBUG)
    for (byte i = 0; i < pos; ++i) {
     Serial.print(data[i] >> 4, HEX);
     Serial.print(data[i] & 0x0F, HEX);
     Serial.print(' ');
   }
   Serial.println();
+  #endif
   Serial.print("Nexa: ");
   if (pos != 4) {
     Serial.println();
@@ -815,26 +819,25 @@ void reportSerialNexa (const char* type, class DecodeOOK& decoder) {
     unique = (unique << 8) | data[1];
     unique = (unique << 8) | data[2];
     unique = (unique << 2) | (data[3] & 0xC0);
-    group = data[3] & 0x10;
-    off = data[3] & 0x8;
-    chan = data[3] & 0xc;
+    group = data[3] & 0x20;
+    on = data[3] & 0x10;
+    chan = data[3] & 0x8;
     unit = data[3] & 0x3;
     
     Serial.print("Unique key ");
     Serial.println(unique);
-    Serial.println(unique, BIN);
 
-    if (!group) {
+    if (group) {
          Serial.println("All commands");
     } else {
        Serial.print("Unit ");
        Serial.println(unit, BIN);
     }
     
-    if (off) {
-         Serial.println("Off");
-    } else {
+    if (on) {
          Serial.println("On");
+    } else {
+         Serial.println("Off";
     }
   
   Serial.println();
@@ -852,7 +855,7 @@ void reportSerial (const char* type, class DecodeOOK& decoder) {
   for (byte i = 0; i < pos; ++i) {
     Serial.print(data[i] >> 4, HEX);
     Serial.print(data[i] & 0x0F, HEX);
-    Serial.print(' ');
+   Serial.print(' ');
   }
   Serial.println();
 #endif
@@ -1098,10 +1101,8 @@ void reportSerial (const char* type, class DecodeOOK& decoder) {
       Serial.print(OutTempBat);
       Serial.println("%");
       //      OutTime = now.unixtime();
-
     }
   }
-
 
 
   //(BTHR918, BTHR968) Temp-Hygro-Baro
@@ -1209,8 +1210,5 @@ void loop () {
     if (pro.nextPulse(p))
       reportSerial("PRO", pro);        
   }
-
-
-
 }
 

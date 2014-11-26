@@ -837,7 +837,7 @@ void reportSerialNexa (const char* type, class DecodeOOK& decoder) {
     if (on) {
          Serial.println("On");
     } else {
-         Serial.println("Off";
+         Serial.println("Off");
     }
   
   Serial.println();

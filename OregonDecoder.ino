@@ -3,6 +3,39 @@
 // New code to decode OOK signals from weather sensors, etc.
 // 2010-04-11 <jcw@equi4.com> http://opensource.org/licenses/mit-license.php
 // $Id: ookDecoder.pde 5331 2010-04-17 10:45:17Z jcw $
+//TODO:
+/**
+ * Decode baseband radio signal from Efergy Elite receiver.
+ * 
+ * Packet consists of a radio preamble of what seems
+ * like random noise for about 200ms followed by a quiet period
+ * of 100ms followed by data for 200ms. Encoding is a FSK type
+ * scheme.
+ * Logic 0 is represented by 3 cycles of "low" frequency square 
+ * wave (period 8t per cycle). 
+ * Logic 1 is represented by 4 cycles of "high" frequncy square
+ * wave (period 6t per cycle).
+ * Logic 0 and Logic 1 have the same period of 24t which is
+ * very approx 2ms [confirm]. Ie t ~= 83 microseconds.
+ *
+ *    +---+   +---+   +---+
+ *    |   |   |   |   |        = Logic 0
+ * +--|   +---+   +---+
+ *   +--+  +--+  +--+  +--+
+ *   |  |  |  |  |  |  |       = Logic 1
+ * +-+  +--+  +--+  +--+
+ *
+ * Decoding this not but looking at frequency, but looking
+ * for 3 long pulses in succession or 4 short pulses. 
+ * 
+ * Data has 3 bytes of synchronization: 0xAB, 0xAB, 0x2D.
+ * Look initially for 0xAB to get byte boundary synchronization. 
+ * Then look for 0x2D to flag start of actual data.
+ *
+ * All inter-pulse calculation must be complete 
+ * within 64x5 microseconds ie ~ 300 microseconds or 300 instructions @ 4MHz)
+ */
+
 
 //#define DEBUG 0
 #define TEST 0
